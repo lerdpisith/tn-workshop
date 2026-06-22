@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scale Ops — เกมจำลอง Auto-scaling (1 เดือน)</title>
+<style>
+  :root{
+    --bg:#0a2422; --bg2:#0e2f2c; --panel:#103b37; --panel2:#0c302d;
+    --line:#1d544e; --teal:#14b8a6; --teal-d:#0f766e; --mint:#5eead4;
+    --ink:#e6f2f1; --mut:#83aaa4; --amber:#e8a33d; --red:#ef6461; --green:#3ddc91;
+    --mono:ui-monospace,"SF Mono","SFMono-Regular",Menlo,Consolas,monospace;
+    --sans:"Inter",-apple-system,system-ui,"Segoe UI",Arial,"Noto Sans Thai",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:radial-gradient(120% 120% at 80% -10%,#13403b 0%,var(--bg) 55%);
+    color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 40px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  button{font-family:var(--sans);cursor:pointer;border:none}
+  button:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 2px 14px;flex-wrap:wrap}
+  .brand .dot{width:11px;height:11px;border-radius:50%;background:var(--mint);box-shadow:0 0 12px var(--mint)}
+  .brand b{letter-spacing:.16em;font-size:13px;color:var(--mint);font-weight:700}
+  .brand span{color:var(--mut);font-size:12px;letter-spacing:.04em}
+
+  .hud{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .stat{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:14px;padding:12px 14px;position:relative;overflow:hidden}
+  .stat .k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  .stat .v{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:3px;line-height:1}
+  .stat .sub{font-size:11px;color:var(--mut);margin-top:4px;font-family:var(--mono)}
+  .stat.warn{border-color:var(--amber)} .stat.danger{border-color:var(--red)}
+  .bar{height:6px;border-radius:4px;background:#0a2a27;margin-top:8px;overflow:hidden}
+  .bar > i{display:block;height:100%;border-radius:4px}
+
+  .game{display:grid;grid-template-columns:1.5fr 1fr;gap:14px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px}
+  .scene{padding:0;overflow:hidden;position:relative;min-height:480px;display:flex;flex-direction:column;box-shadow:0 0 0 1px rgba(20,184,166,.18), 0 22px 60px -28px rgba(0,0,0,.7)}
+  .cap-strip{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)}
+  .cap-strip .lab{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  .cap-strip .val{font-family:var(--mono);font-size:15px}
+  #cv{display:block;width:100%;flex:1}
+  .spark-wrap{border-top:1px solid var(--line);padding:8px 12px 10px}
+  .spark-wrap .sl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--mut);letter-spacing:.06em;margin-bottom:4px}
+  .spark-wrap .sl .d{color:var(--red)} .spark-wrap .sl .c{color:var(--mint)}
+  #spark{display:block;width:100%;height:54px}
+
+  .ctrl{padding:16px;display:flex;flex-direction:column;gap:13px}
+  .speed{display:flex;gap:8px;align-items:center}
+  .speed .pp{flex:none;width:46px;height:40px;border-radius:11px;background:#0a2a27;border:1px solid var(--line);color:var(--ink);font-size:16px;display:grid;place-items:center}
+  .speed .pp:hover{border-color:var(--teal)}
+  .seg{display:flex;flex:1;background:#0a2a27;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .seg button{flex:1;padding:10px 0;background:transparent;color:var(--mut);font-weight:700;font-family:var(--mono);font-size:14px}
+  .seg button.on{background:linear-gradient(180deg,var(--teal),var(--teal-d));color:#042421}
+
+  .banner{min-height:0;border-radius:11px;font-size:13px;font-weight:600;display:none;align-items:center;gap:9px;padding:10px 13px}
+  .banner.show{display:flex}
+  .banner.evt{background:#3a1716;color:var(--red);border:1px solid #5a2422}
+  .banner.calm{background:#0e3a32;color:var(--green);border:1px solid #195245}
+
+  .units{display:flex;flex-direction:column;gap:9px}
+  .unit{display:flex;align-items:center;gap:11px;background:#0c302d;border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+  .unit .ico{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:13px;color:#04211d;flex:none}
+  .unit .meta{flex:1;min-width:0}
+  .unit .meta .nm{font-weight:700;font-size:14px}
+  .unit .meta .sp{font-size:11px;color:var(--mut);font-family:var(--mono)}
+  .step{display:flex;align-items:center;gap:8px}
+  .step button{width:32px;height:32px;border-radius:9px;background:#0a2a27;border:1px solid var(--line);color:var(--ink);font-size:19px;font-weight:700;line-height:1;display:grid;place-items:center}
+  .step button:hover{background:#124b45;border-color:var(--teal)}
+  .step button:active{transform:translateY(1px)}
+  .step .n{width:30px;text-align:center;font-family:var(--mono);font-size:18px;font-weight:600}
+
+  .preview{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);border-top:1px solid var(--line);padding-top:11px}
+  .preview .mono{color:var(--ink);font-size:14px}
+  .preview .over{color:var(--amber)} .preview .under{color:var(--red)} .preview .ok{color:var(--green)}
+
+  .log{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:#0b302d;max-height:120px;overflow:auto}
+  .log .row{display:flex;gap:10px;padding:8px 13px;border-bottom:1px solid #103833;font-size:13px}
+  .log .row:last-child{border-bottom:none}
+  .log .row .t{font-family:var(--mono);color:var(--mut);flex:none}
+  .log .row.ok .m{color:var(--ink)} .log .row.bad .m{color:var(--red)} .log .row.warn .m{color:var(--amber)} .log .row.good .m{color:var(--green)}
+
+  .ov{position:fixed;inset:0;background:rgba(6,24,22,.9);backdrop-filter:blur(5px);display:grid;place-items:center;padding:22px;z-index:20}
+  .ov .box{max-width:580px;width:100%;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:20px;padding:30px}
+  .ov h1{margin:0 0 6px;font-size:30px;letter-spacing:-.01em}
+  .ov h1 .sm{display:block;font-size:13px;letter-spacing:.18em;color:var(--mint);font-weight:700;margin-bottom:9px}
+  .ov p{color:var(--mut);line-height:1.6;font-size:14.5px}
+  .rules{list-style:none;padding:0;margin:16px 0 4px;display:flex;flex-direction:column;gap:10px}
+  .rules li{display:flex;gap:12px;align-items:flex-start;background:#0c302d;border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+  .rules .num{font-family:var(--mono);font-weight:800;color:var(--mint);flex:none;font-size:15px}
+  .rules .tx{font-size:14px;line-height:1.45} .rules .tx b{color:var(--ink)}
+  .ov .go{margin-top:20px;width:100%;padding:15px;border-radius:13px;background:linear-gradient(180deg,var(--teal),var(--teal-d));color:#042421;font-weight:800;font-size:16px}
+  .ov .go:hover{filter:brightness(1.06)}
+  .score{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:18px 0 4px}
+  .score div{background:#0c302d;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .score .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em}
+  .score .v{font-family:var(--mono);font-size:21px;font-weight:600;margin-top:4px}
+  .verdict-win{color:var(--mint)} .verdict-lose{color:var(--red)}
+  .tips{font-size:12.5px;color:var(--mut);margin-top:14px;line-height:1.55;border-top:1px solid var(--line);padding-top:12px}
+
+  .resbrief{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:#0b302d;padding:13px 14px}
+  .resbrief .rb-title{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mint);font-weight:700;margin-bottom:7px}
+  .resrow{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #103833;font-size:13px}
+  .resrow:last-of-type{border-bottom:none}
+  .resrow .tag{font-family:var(--mono);font-weight:700;color:#04211d;border-radius:6px;padding:2px 9px;font-size:12px;text-align:center}
+  .resrow .cap{font-family:var(--mono);color:var(--ink)}
+  .resrow .eff{font-family:var(--mono);color:var(--mut);font-size:12px;text-align:right;white-space:nowrap}
+  .resbrief .need{margin-top:10px;font-size:13px;color:var(--ink);line-height:1.5}
+  .resbrief .need b{color:var(--mint);font-family:var(--mono)}
+  .resbrief .warn2{margin-top:7px;font-size:12px;color:var(--amber);line-height:1.45}
+
+  .ov .box{max-height:92vh;overflow:auto}
+  .rules2{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:#0b302d;padding:13px 14px}
+  .rules2 .rb-title{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mint);font-weight:700;margin-bottom:3px}
+  .rules2 .hint{font-size:11.5px;color:var(--mut);margin-bottom:6px;line-height:1.4}
+  .rrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #103833;font-size:13px}
+  .rrow:last-child{border-bottom:none}
+  .rrow .rk{font-weight:700;color:var(--mint);min-width:92px}
+  .rrow select{background:#0a2a27;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-family:var(--mono);font-size:13px}
+  .sw{display:inline-flex;align-items:center;gap:7px;font-weight:700;color:var(--mint);min-width:92px;cursor:pointer}
+  .sw input{accent-color:var(--teal);width:15px;height:15px}
+  .autostat{margin-top:6px;font-size:11.5px;color:var(--mut);font-family:var(--mono);border-top:1px solid var(--line);padding-top:9px;line-height:1.5}
+  .autostat b{color:var(--mint)}
+
+  .steps-wrap{margin-top:14px}
+  .dots{display:flex;gap:6px;align-items:center;margin-bottom:11px}
+  .dots .d{width:30px;height:6px;border-radius:3px;background:#0a2a27;border:1px solid var(--line);transition:background .2s}
+  .dots .d.on{background:var(--teal);border-color:var(--teal)}
+  .dots .lbl{margin-left:auto;font-size:11px;color:var(--mut);font-family:var(--mono)}
+  .stepcard{border:1px solid var(--line);border-radius:12px;background:#0b302d;padding:13px 14px;margin-bottom:10px}
+  .stepcard.hidden{display:none}
+  .stepcard .sc-h{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+  .stepcard .sc-n{width:25px;height:25px;border-radius:7px;background:var(--teal);color:#042421;font-family:var(--mono);font-weight:800;font-size:13px;display:grid;place-items:center;flex:none}
+  .stepcard .sc-t{font-weight:700;font-size:14px;color:var(--ink);line-height:1.25}
+  .stepcard .sc-t span{display:block;font-size:11px;color:var(--mint);font-weight:600;margin-top:1px}
+  .stepcard .sc-d{font-size:12.5px;color:var(--mut);margin-bottom:10px;line-height:1.5}
+  .stepnav{display:flex;gap:9px;align-items:stretch}
+  .stepnav .skip{flex:none;padding:0 15px;border-radius:13px;background:#0a2a27;color:var(--mut);border:1px solid var(--line);font-weight:700;font-size:13px}
+  .stepnav .skip:hover{border-color:var(--teal);color:var(--ink)}
+
+  .stepcard.pick{cursor:pointer;transition:border-color .15s,background .15s}
+  .stepcard.pick:hover{border-color:var(--teal)}
+  .stepcard.sel{border-color:var(--teal);background:#0e3a35}
+  .stepcard.sel .sc-n{box-shadow:0 0 0 3px rgba(20,184,166,.28)}
+  #modeparams{margin:2px 0 10px}
+  #modeparams .rrow{padding:7px 0}
+  #modeparams .rrow .rk{min-width:96px}
+
+  .board{margin-top:13px;border:1px solid var(--line);border-radius:12px;background:#0b302d;overflow:hidden}
+  .board-h{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mint);font-weight:700;padding:10px 13px;border-bottom:1px solid #103833}
+  .brow{display:flex;align-items:center;gap:10px;padding:8px 13px;border-bottom:1px solid #103833;font-size:13px}
+  .brow:last-child{border-bottom:none}
+  .brow .bn{width:21px;height:21px;border-radius:6px;background:#0a2a27;border:1px solid var(--line);display:grid;place-items:center;font-family:var(--mono);font-size:11px;color:var(--mut);flex:none}
+  .brow .bt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .brow .bs{font-family:var(--mono);color:var(--ink);flex:none}
+  .brow .bw{color:var(--green)}
+  .brow.hl{background:#0e3a35}
+  .brow.hl .bn{background:var(--teal);color:#042421;border-color:var(--teal)}
+  .brow.total{background:#0a2a27;font-weight:700}
+  .brow.total .bn{color:var(--mint)}
+  .brow.total .bs{color:var(--mint)}
+  .record{margin:14px 0 4px;padding:11px 14px;border-radius:12px;text-align:center;font-weight:800;font-size:15px;color:#042421;background:linear-gradient(180deg,var(--mint),var(--teal));box-shadow:0 0 24px -4px var(--teal)}
+
+  .stepcard.lvl{margin-bottom:10px}
+  .stepcard.off{opacity:.5;filter:grayscale(.35);cursor:not-allowed}
+  .stepcard .sc-h .badge{margin-left:auto;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;flex:none}
+  .badge.lock{background:#0a2a27;color:var(--mut);border:1px solid var(--line)}
+  .badge.done{background:#0e3a32;color:var(--green);border:1px solid #195245}
+  .badge.play{background:linear-gradient(180deg,var(--teal),var(--teal-d));color:#042421}
+  .lvl-best{font-size:12px;color:var(--mut);margin-top:8px;font-family:var(--mono)}
+  .lvl-best b{color:var(--ink)}
+
+  @media (max-width:840px){ .hud{grid-template-columns:1fr 1fr} .game{grid-template-columns:1fr} .scene{min-height:340px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="dot"></span><b>SCALE OPS</b><span>· เกมจำลอง Auto-scaling · ภารกิจ 1 เดือน · NT BootCamp</span></div>
+
+  <div class="hud">
+    <div class="stat" id="st-budget"><div class="k">เครดิตคงเหลือ</div><div class="v mono" id="v-budget">—</div>
+      <div class="bar"><i id="bar-budget" style="background:var(--mint)"></i></div></div>
+    <div class="stat"><div class="k">เวลา</div><div class="v mono" id="v-day">วัน 1</div><div class="sub" id="v-clock">00:00</div></div>
+    <div class="stat" id="st-rep"><div class="k">Error Budget</div><div class="v mono" id="v-rep">100%</div>
+      <div class="sub" id="v-slo">SLO —</div>
+      <div class="bar"><i id="bar-rep" style="background:var(--green)"></i></div></div>
+    <div class="stat"><div class="k">ผู้ใช้ที่รองรับ</div><div class="v mono" id="v-served">0</div><div class="sub">คำขอสะสม</div></div>
+  </div>
+
+  <div class="game">
+    <div class="card scene">
+      <div class="cap-strip">
+        <div><span class="lab">ความจุระบบ</span> <span class="val mono" id="v-cap">0</span> <span class="lab">req/s</span></div>
+        <div><span class="lab">ทราฟฟิกเข้า</span> <span class="val mono" id="v-dem">0</span> <span class="lab">req/s</span></div>
+      </div>
+      <canvas id="cv"></canvas>
+      <div class="spark-wrap">
+        <div class="sl"><span class="d">▬ ทราฟฟิกเข้า</span><span class="c">▬ ความจุ</span></div>
+        <canvas id="spark"></canvas>
+      </div>
+    </div>
+
+    <div class="card ctrl">
+      <div class="speed">
+        <button class="pp" id="pp" aria-label="เล่น/หยุด">⏸</button>
+        <div class="seg" role="group" aria-label="ความเร็ว">
+          <button data-s="1" class="on">1×</button>
+          <button data-s="2">2×</button>
+          <button data-s="3">3×</button>
+        </div>
+      </div>
+
+      <div class="banner" id="banner"></div>
+
+      <div class="units">
+        <div class="unit">
+          <div class="ico" style="background:var(--teal)">VM</div>
+          <div class="meta"><div class="nm">VM node</div><div class="sp" id="cpu-sp">15 req/s · 6 เครดิต/ชม.</div></div>
+          <div class="step"><button id="cpu-dn" aria-label="ลด VM">−</button><div class="n mono" id="cpu-n">0</div><button id="cpu-up" aria-label="เพิ่ม VM">+</button></div>
+        </div>
+      </div>
+
+      <div class="preview">
+        <span>ความจุ <span class="mono" id="p-cap">0</span></span>
+        <span id="p-fit" class="mono ok">—</span>
+        <span>เบิร์น <span class="mono" id="p-burn">0</span>/ชม.</span>
+      </div>
+      <div class="autostat" id="autostat">🤖 auto: ปิด</div>
+    </div>
+  </div>
+
+  <div class="card log" id="log" aria-live="polite"></div>
+</div>
+
+<div class="ov" id="ov"><div class="box" id="ov-box"></div></div>
+
+<script>
+"use strict";
+(function(){
+  const CFG = { days:30, repStart:100, cpu:{cap:15,cost:6}, baseHps:6 };
+  const DIFF = {
+    easy:  {name:"ง่าย", budget:52000, ev:[3,1], mag:0.8,  slo:0.95},
+    normal:{name:"ปกติ", budget:40000, ev:[4,2], mag:1.0,  slo:0.97},
+    hard:  {name:"ยาก",  budget:30000, ev:[5,1], mag:1.2,  slo:0.99},
+  };
+  const MODES = [
+    {t:"กำหนดทรัพยากร (คงที่)", s:"Resource Management",
+     short:"ตั้ง VM คงที่ให้พอดีทั้งเดือน",
+     obj:"โจทย์ด่านนี้: ทรัพยากรปรับระหว่างรันไม่ได้ — ตั้งจำนวน VM ครั้งเดียวให้รับพีคได้ แต่ไม่เปลืองตอนกลางคืน หาจุดที่คุ้มสุดให้ได้"},
+    {t:"Scale เอง (ไม่มีตัวช่วย)", s:"ทำไมต้อง Auto-scaling",
+     short:"ปรับ VM เองสด ๆ ตามทราฟฟิก",
+     obj:"โจทย์ด่านนี้: ไม่มีระบบช่วยเลย — ต้องเฝ้ากราฟแล้วกดเพิ่ม/ลด VM เองให้ทันทุกช่วง จะรู้สึกเลยว่าเหนื่อยและพลาดง่าย"},
+    {t:"Scheduled scaling", s:"เฉลย — รู้ล่วงหน้า เตรียมก่อน",
+     short:"ตั้งเวลาเพิ่ม/ลด VM ล่วงหน้า",
+     obj:"โจทย์ด่านนี้: รู้ว่าพีคทุกวันเวลาไหน — ตั้งตารางเวลาเพิ่ม VM ก่อนพีค และลดหลังพีค ให้ตรงจังหวะ"},
+    {t:"Auto-scaling", s:"กลไก วัด→ตรวจจับ→ลงมือ",
+     short:"ระบบวัด %ความจุ แล้วปรับเอง",
+     obj:"โจทย์ด่านนี้: ตั้งเกณฑ์ให้ระบบ วัด→ตรวจจับ→เพิ่ม/ลด VM เอง — จูนเกณฑ์ให้ไม่ล้นและไม่เปลือง"},
+    {t:"Auto + Graceful shutdown", s:"12-Factor — Disposability",
+     short:"auto + ปิดเครื่องไม่ให้ request หลุด",
+     obj:"โจทย์ด่านนี้: เหมือนด่าน 4 แต่เพิ่ม graceful drain — ตอน scale-in ระบบจะ drain งานให้จบก่อน ไม่มี request หลุด"},
+  ];
+  let selDiff="normal";
+  const $=id=>document.getElementById(id);
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const TH=n=>Math.round(n).toLocaleString("en-US");
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion:reduce)").matches;
+  let G=null;
+
+  // ---------- cumulative scores per mode (persist if possible, else in-memory) ----------
+  let BEST = loadBest();
+  function loadBest(){ try{ const s=localStorage.getItem("scaleops_best"); if(s)return JSON.parse(s); }catch(e){} return {}; }
+  function saveBest(){ try{ localStorage.setItem("scaleops_best",JSON.stringify(BEST)); }catch(e){} }
+  function recordScore(mode,score,won){
+    const cur=BEST[mode]||{score:0,won:false,plays:0};
+    const rec = score>cur.score;
+    BEST[mode]={ score:Math.max(cur.score,score), won:cur.won||won, plays:cur.plays+1 };
+    saveBest(); return rec;
+  }
+  function scoreTable(hl){
+    let rows="", sum=0;
+    for(let i=1;i<=5;i++){ const m=BEST[i], sc=m?m.score:0; sum+=sc;
+      rows+='<div class="brow'+(hl===i?' hl':'')+'"><span class="bn">'+i+'</span>'+
+        '<span class="bt">'+MODES[i-1].t+'</span>'+
+        '<span class="bs mono">'+(m?TH(sc):'—')+(m&&m.won?' <span class="bw">✓</span>':'')+'</span></div>'; }
+    return '<div class="board"><div class="board-h">🏆 คะแนนสะสมแต่ละโหมด</div>'+rows+
+      '<div class="brow total"><span class="bn">Σ</span><span class="bt">รวมทุกโหมด</span><span class="bs mono">'+TH(sum)+'</span></div></div>';
+  }
+  let ALLUNLOCK=false; try{ ALLUNLOCK = localStorage.getItem("scaleops_unlockall")==="1"; }catch(e){}
+  function setUnlockAll(v){ ALLUNLOCK=v; try{ localStorage.setItem("scaleops_unlockall",v?"1":"0"); }catch(e){} }
+  function stageUnlocked(i){ return i===0 || ALLUNLOCK || !!(BEST[i] && BEST[i].won); }
+  function stageCleared(i){ return !!(BEST[i+1] && BEST[i+1].won); }
+
+  // ---------- scenario ----------
+  function genEvents(diff){
+    const evs=[]; const n=diff.ev[0]+Math.floor(Math.random()*(diff.ev[1]+1));
+    const labels=[["⚡ ไวรัล! ทราฟฟิกพุ่ง",1.6],["🛒 แฟลชเซล",1.4],["📣 ออกข่าว/พีอาร์",1.3],["🎉 แคมเปญใหญ่",1.5]];
+    for(let i=0;i<n;i++){
+      const s=12+Math.random()*(CFG.days*24-30);
+      const dur=2+Math.random()*4;
+      const pick=labels[Math.floor(Math.random()*labels.length)];
+      evs.push({s, e:s+dur, mag:pick[1]*diff.mag*(0.85+Math.random()*0.3), label:pick[0], fired:false});
+    }
+    return evs.sort((a,b)=>a.s-b.s);
+  }
+  function demandAt(h){
+    const d=Math.floor(h/24), hod=h%24;
+    const growth = 40 + (90-40)*(d/(CFG.days-1));
+    const morning=Math.exp(-Math.pow((hod-12)/3.4,2))*0.5;
+    const evening=Math.exp(-Math.pow((hod-19)/2.7,2))*1.0;
+    let f=0.28+morning+evening;
+    const dow=d%7; if(dow===5||dow===6) f*=1.12;
+    let dem=growth*f;
+    for(const ev of G.events){ if(h>=ev.s&&h<ev.e){ const t=(h-ev.s)/(ev.e-ev.s); dem*=1+(ev.mag-1)*Math.sin(Math.PI*clamp(t,0,1)); } }
+    dem*=1+0.05*Math.sin(h*1.9)+0.04*Math.sin(h*0.7);
+    return Math.max(2,dem);
+  }
+
+  // ---------- level map ----------
+  function showLevels(){
+    $("ov").style.display="grid";
+    let cards="";
+    MODES.forEach((m,i)=>{
+      const unlocked=stageUnlocked(i), cleared=stageCleared(i);
+      const best=BEST[i+1]?TH(BEST[i+1].score):"—";
+      const status = !unlocked ? '<span class="badge lock">🔒 ล็อก</span>'
+        : cleared ? '<span class="badge done">✓ ผ่าน</span>'
+        : '<span class="badge play">▶ เล่นได้</span>';
+      cards+='<div class="stepcard lvl'+(unlocked?' pick':' off')+'" data-i="'+i+'">'+
+        '<div class="sc-h"><div class="sc-n">'+(i+1)+'</div><div class="sc-t">'+m.t+'<span>'+m.s+'</span></div>'+status+'</div>'+
+        '<div class="sc-d">'+m.short+'</div>'+
+        '<div class="lvl-best">สถิติด่านนี้: <b class="mono">'+best+'</b></div></div>';
+    });
+    $("ov-box").innerHTML=
+      '<h1><span class="sm">SCALE OPS · แผนที่ด่าน</span>ไล่เก็บทีละด่าน</h1>'+
+      '<p>โฟกัสทีละแนวคิด — ผ่านด่าน (รอดครบ 1 เดือน) เพื่อปลดล็อกด่านถัดไป</p>'+
+      '<p style="font-weight:700;color:var(--ink);font-size:13px;margin-top:10px">ระดับความยาก</p>'+
+      '<div class="seg" id="diffseg" style="margin-top:7px">'+
+        '<button data-d="easy"'+(selDiff==="easy"?' class="on"':'')+'>ง่าย</button>'+
+        '<button data-d="normal"'+(selDiff==="normal"?' class="on"':'')+'>ปกติ</button>'+
+        '<button data-d="hard"'+(selDiff==="hard"?' class="on"':'')+'>ยาก</button>'+
+      '</div>'+
+      '<div class="steps-wrap" style="margin-top:12px">'+cards+'</div>'+
+      '<div class="stepnav"><button class="skip" id="unlockall">'+(ALLUNLOCK?'🔒 ล็อกตามด่าน':'🔓 ปลดล็อกทุกด่าน')+'</button>'+
+        '<button class="skip" id="resetprog">↺ ล้างสถิติ</button></div>';
+    $("diffseg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+      selDiff=b.dataset.d; $("diffseg").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); }));
+    document.querySelectorAll(".stepcard.lvl.pick").forEach(c=>c.addEventListener("click",()=>prepareStage(+c.dataset.i)));
+    $("unlockall").onclick=()=>{ setUnlockAll(!ALLUNLOCK); showLevels(); };
+    $("resetprog").onclick=()=>{ BEST={}; saveBest(); showLevels(); };
+  }
+
+  // ---------- prepare a stage ----------
+  function prepareStage(i){
+    const d=DIFF[selDiff];
+    G={ budget:d.budget, budget0:d.budget, eb:100, dropped:0, slo:d.slo, ebAllowed:0, served:0, simHour:0, running:false, speed:1,
+        cpu:0, mode:i+1, manualLocked:(i===0), graceful:(i===4),
+        events:null, hist:[], spawnAcc:0, parts:[], lastTs:0, phase:"config",
+        curDem:0, curServed:0, curCap:0, lastSample:0, lastBanner:"", diff:d, brief:null };
+    G.events=genEvents(d);
+    let peak=0,sum=0,cnt=0,d0=0;
+    for(let h=0; h<CFG.days*24; h++){ const v=demandAt(h); peak=Math.max(peak,v); sum+=v; cnt++; if(h<24)d0=Math.max(d0,v); }
+    G.brief={peak,avg:sum/cnt,d0};
+    G.ebAllowed = Math.max(1, (1-d.slo) * (sum*3600));   // allowed dropped requests for the month
+    G.cpu = Math.max(5, Math.min(8, Math.ceil((sum/cnt)/CFG.cpu.cap)+3));
+    G.rules={ schedule:null, upUtil:85, step:1, lastAuto:-99 };
+    if(i===2) G.rules.schedule=buildSchedule();
+    $("cpu-sp").textContent=CFG.cpu.cap+" req/s · "+CFG.cpu.cost+" เครดิต/ชม.";
+    $("log").innerHTML="";
+    showStageBrief(i);
+  }
+
+  function cfgUnit(){
+    return '<div class="unit"><div class="ico" style="background:var(--teal)">VM</div>'+
+      '<div class="meta"><div class="nm">VM node</div><div class="sp">'+CFG.cpu.cap+' req/s · '+CFG.cpu.cost+' เครดิต/ชม.</div></div>'+
+      '<div class="step"><button id="cfg-cpu-dn" aria-label="ลด VM">−</button><div class="n mono" id="cfg-cpu-n">0</div><button id="cfg-cpu-up" aria-label="เพิ่ม VM">+</button></div></div>';
+  }
+  function renderCfgPreview(){
+    $("cfg-cpu-n").textContent=G.cpu;
+    const cap=capacity(), burn=burnRate();
+    $("cfg-cap").textContent=cap; $("cfg-burn").textContent=burn;
+    const f=G.brief.d0, fit=$("cfg-fit");
+    if(cap<f*0.95){ fit.className="mono under"; fit.textContent="น้อยกว่าพีควันแรก ▼"; }
+    else if(cap>f*1.7){ fit.className="mono over"; fit.textContent="เผื่อเยอะ ▲"; }
+    else { fit.className="mono ok"; fit.textContent="พอดีช่วงแรก ✓"; }
+  }
+
+  function padH(h){ return (h<10?'0':'')+h+':00'; }
+  function sloPct(s){ const p=s*100; return (p%1===0?p.toFixed(0):p.toFixed(1))+"%"; }
+  function sloInv(s){ const p=(1-s)*100; return (p%1===0?p.toFixed(0):p.toFixed(p<1?2:1))+"%"; }
+  function hourOpts(sel){ let o=''; for(let h=0;h<24;h++) o+='<option value="'+h+'"'+(h===sel?' selected':'')+'>'+padH(h)+'</option>'; return o; }
+  function numOpts(arr,sel){ return arr.map(v=>'<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>').join(''); }
+
+  function stageParams(i){
+    if(i===2){
+      const need=Math.ceil(G.brief.peak/CFG.cpu.cap);
+      let html='<div class="sc-d" style="margin:0 0 9px">ตั้งเวลาเพิ่ม/ลด VM (ทำซ้ำทุกวัน) — พีคเย็นราว <b>19:00</b> (~'+Math.round(G.brief.peak)+' req/s ⇒ ~'+need+' VM) · เบาสุด <b>ตี 3–5</b></div>';
+      G.rules.schedule.forEach((a,idx)=>{ html+='<div class="rrow"><span class="rk">'+a.label+'</span>เวลา <select class="sh" data-si="'+idx+'">'+hourOpts(a.h)+'</select> → ตั้ง VM = <select class="scpu" data-si="'+idx+'">'+numOpts(Array.from({length:21},(_,k)=>k),a.cpu)+'</select></div>'; });
+      return html;
+    }
+    if(i>=3){
+      return '<div class="rrow"><span class="rk">เครื่องมือวัด</span>% การใช้ความจุ</div>'+
+        '<div class="rrow"><span class="rk">ตรวจจับ</span>เพิ่ม VM เมื่อ ≥ <select id="r-th">'+numOpts([70,75,80,85,90],G.rules.upUtil)+'</select> % (ต่ำกว่ามากจะลดให้)</div>'+
+        '<div class="rrow"><span class="rk">action</span>ปรับครั้งละ ± <select id="r-step">'+numOpts([1,2,3],G.rules.step)+'</select> VM'+(i===4?' · <b style="color:var(--mint)">graceful drain ✓</b>':'')+'</div>';
+    }
+    return '<div class="rrow" style="color:var(--mut);display:block">'+(i===0
+      ? 'ทรัพยากร <b style="color:var(--ink)">คงที่</b> — ตั้ง VM ด้านล่างให้ดี เพราะปรับระหว่างรันไม่ได้'
+      : 'ปรับ VM ด้วยมือเองระหว่างรัน (ปุ่ม −/+ หรือลูกศรขึ้น-ลง) ต้องคอยเฝ้ากราฟ')+'</div>';
+  }
+  function bindStageParams(i){
+    if(i===2){
+      $("modeparams").querySelectorAll("select.sh").forEach(s=>s.onchange=()=>{ const k=+s.dataset.si; G.rules.schedule[k].h=+s.value; G.rules.schedule[k].lastDay=-1; });
+      $("modeparams").querySelectorAll("select.scpu").forEach(s=>s.onchange=()=>{ const k=+s.dataset.si; G.rules.schedule[k].cpu=+s.value; });
+    }
+    if(i>=3){ $("r-th").onchange=()=>{G.rules.upUtil=+$("r-th").value;}; $("r-step").onchange=()=>{G.rules.step=+$("r-step").value;}; }
+  }
+  function showStageBrief(i){
+    const b=G.brief, m=MODES[i], cpuNeed=Math.ceil(b.peak/CFG.cpu.cap);
+    const best=BEST[i+1]?TH(BEST[i+1].score):"—";
+    $("ov").style.display="grid";
+    $("ov-box").innerHTML=
+      '<h1><span class="sm">ด่าน '+(i+1)+'/5 · ระดับ '+G.diff.name+'</span>'+m.t+'</h1>'+
+      '<p>'+m.obj+'</p>'+
+      '<div class="score">'+
+        '<div><div class="k">งบประมาณ</div><div class="v" style="color:var(--mint)">'+TH(G.budget0)+'</div></div>'+
+        '<div><div class="k">ระยะเวลา</div><div class="v">'+CFG.days+' วัน</div></div>'+
+        '<div><div class="k">สถิติด่านนี้</div><div class="v" style="color:var(--mint)">'+best+'</div></div>'+
+      '</div>'+
+      '<p style="margin-top:12px">1 VM ≈ <b class="mono">'+CFG.cpu.cap+'</b> req/s · '+CFG.cpu.cost+' เครดิต/ชม. — พีคสูงสุดราว <b class="mono">'+Math.round(b.peak)+'</b> req/s → ต้องใช้ราว <b class="mono">'+cpuNeed+' VM</b> ช่วงพีค</p>'+
+      '<p style="margin-top:8px;background:#0c302d;border:1px solid var(--line);border-radius:10px;padding:10px 12px">🎯 เป้าหมาย <b>SLO '+sloPct(G.slo)+'</b> — มี <b>error budget</b> ให้คำขอ "หลุด" ได้ไม่เกิน <b>'+sloInv(G.slo)+'</b> ของทั้งเดือน · หลุดเกินนี้ = ละเมิด SLO (แพ้)</p>'+
+      '<div class="steps-wrap">'+
+        '<div id="modeparams">'+stageParams(i)+'</div>'+
+        '<div class="rb-title" style="color:var(--mut);font-size:11px;letter-spacing:.1em;margin:4px 0 6px">จำนวน VM เริ่มต้น</div>'+
+        '<div class="units">'+cfgUnit()+'</div>'+
+        '<div class="preview"><span>ความจุเริ่มต้น <span class="mono" id="cfg-cap">0</span> req/s</span>'+
+          '<span id="cfg-fit" class="mono ok">—</span>'+
+          '<span>เบิร์น <span class="mono" id="cfg-burn">0</span>/ชม.</span></div>'+
+        '<div class="stepnav"><button class="skip" id="backmap">🗺️ แผนที่</button>'+
+          '<button class="skip" id="regen">🎲 สุ่มโจทย์</button>'+
+          '<button class="go" id="run-go" style="flex:1;margin-top:0">▶ เริ่มด่านนี้</button></div>'+
+      '</div>';
+    bindStageParams(i);
+    const bind=(id,d)=>$(id).addEventListener("click",()=>{ G.cpu=clamp(G.cpu+d,0,30); renderCfgPreview(); });
+    bind("cfg-cpu-up",1); bind("cfg-cpu-dn",-1);
+    $("run-go").onclick=beginRun;
+    $("regen").onclick=()=>prepareStage(i);
+    $("backmap").onclick=showLevels;
+    renderCfgPreview();
+  }
+  function beginRun(){
+    $("ov").style.display="none";
+    G.phase="run"; G.running=true; setSpeed(1); $("pp").textContent="⏸";
+    $("cpu-up").disabled=G.manualLocked; $("cpu-dn").disabled=G.manualLocked;
+    logMsg("วัน 1","เริ่มโหมด "+G.mode+": "+MODES[G.mode-1].t+" · เริ่มด้วย "+G.cpu+" VM","good");
+    resize(); syncPlan(); syncHud();
+    G.lastTs=performance.now();
+    requestAnimationFrame(loop);
+  }
+  function capacity(){ return G.cpu*CFG.cpu.cap; }
+  function burnRate(){ return G.cpu*CFG.cpu.cost; }
+
+  function syncHud(){
+    $("v-budget").textContent=TH(Math.max(0,G.budget));
+    $("bar-budget").style.width=clamp(G.budget/G.budget0*100,0,100)+"%";
+    const lowB=G.budget<G.budget0*0.12, midB=G.budget<G.budget0*0.25;
+    $("bar-budget").style.background=lowB?"var(--red)":(midB?"var(--amber)":"var(--mint)");
+    $("st-budget").className="stat"+(lowB?" danger":(midB?" warn":""));
+    const day=Math.min(CFG.days,Math.floor(G.simHour/24)+1), hod=Math.floor(G.simHour%24);
+    $("v-day").textContent="วัน "+day+" / "+CFG.days;
+    $("v-clock").textContent=(hod<10?"0":"")+hod+":00";
+    $("v-rep").textContent=Math.round(G.eb)+"%";
+    $("v-slo").textContent="SLO "+sloPct(G.slo);
+    $("bar-rep").style.width=clamp(G.eb,0,100)+"%";
+    $("bar-rep").style.background=G.eb<20?"var(--red)":(G.eb<50?"var(--amber)":"var(--green)");
+    $("st-rep").className="stat"+(G.eb<20?" danger":(G.eb<50?" warn":""));
+    $("v-served").textContent=servedStr();
+    $("v-cap").textContent=Math.round(G.curCap);
+    $("v-dem").textContent=Math.round(G.curDem);
+  }
+  function servedStr(){ const m=G.served/1e6; return m>=1? m.toFixed(1)+"M" : Math.round(G.served/1e3)+"K"; }
+
+  function syncPlan(){
+    $("cpu-n").textContent=G.cpu;
+    const cap=capacity(), burn=burnRate();
+    $("p-cap").textContent=cap; $("p-burn").textContent=burn;
+    const f=G.curDem||demandAt(G.simHour), fit=$("p-fit");
+    if(cap<f*0.95){ fit.className="mono under"; fit.textContent="ทราฟฟิกล้น ▼"; }
+    else if(cap>f*1.7){ fit.className="mono over"; fit.textContent="เผื่อเยอะ ▲"; }
+    else { fit.className="mono ok"; fit.textContent="กำลังดี ✓"; }
+    const a=$("autostat");
+    if(G.rules&&a){ let s="โหมด "+G.mode+": <b>"+MODES[G.mode-1].t+"</b>";
+      if(G.mode===1) s+=" · 🔒 คงที่";
+      if(G.mode===3 && G.rules.schedule) s+=" · 🗓️ "+G.rules.schedule.map(x=>padH(x.h)+"→"+x.cpu).join(", ");
+      if(G.mode>=4) s+=" · 🤖 ≥"+G.rules.upUtil+"% ±"+G.rules.step;
+      if(G.graceful) s+=" · ✓ graceful";
+      a.innerHTML=s; }
+  }
+  function logMsg(t,m,kind){
+    const r=document.createElement("div"); r.className="row "+(kind||"ok");
+    r.innerHTML='<span class="t">'+t+'</span><span class="m">'+m+'</span>';
+    const L=$("log"); L.insertBefore(r,L.firstChild);
+    while(L.children.length>40) L.removeChild(L.lastChild);
+  }
+  function dayLabel(){ return "วัน "+(Math.floor(G.simHour/24)+1); }
+
+  // ---------- graceful scale-in (12-factor disposability) ----------
+  function gracefulCheck(prev,next){
+    if(next>=prev) return;
+    if(G.graceful){ logMsg(dayLabel(),"✓ graceful drain: ปิด "+(prev-next)+" เครื่องโดยไม่มี request หลุด","good"); }
+    else if(G.curDem>10){ G.dropped += (prev-next)*CFG.cpu.cap*10; logMsg(dayLabel(),"⚠ ตัดเครื่องทันที ("+(prev-next)+") — request หลุด กิน error budget","warn"); }
+  }
+
+  // ---------- auto policy (schedule + measure->detect->action) ----------
+  function buildSchedule(){
+    const need=Math.ceil(G.brief.peak/CFG.cpu.cap);
+    return [
+      {label:"เพิ่มช่วงเช้า",    h:8,  cpu:Math.max(2,Math.ceil(need*0.6)),  lastDay:-1},
+      {label:"เพิ่มช่วงพีคเย็น", h:17, cpu:need,                           lastDay:-1},
+      {label:"ลดช่วงดึก",       h:23, cpu:Math.max(1,Math.ceil(need*0.35)), lastDay:-1},
+    ];
+  }
+  function applyRules(){
+    const r=G.rules; if(!r)return;
+    if(G.mode===3 && r.schedule){
+      const day=Math.floor(G.simHour/24), hod=G.simHour%24;
+      for(const a of r.schedule){
+        if(a.lastDay!==day && hod>=a.h){ const prev=G.cpu; G.cpu=clamp(a.cpu,0,30); a.lastDay=day;
+          logMsg(dayLabel(),"🗓️ "+padH(a.h)+" → ตั้ง VM = "+a.cpu,"good"); if(G.cpu<prev)gracefulCheck(prev,G.cpu); }
+      }
+    }
+    if(G.mode>=4 && G.simHour-r.lastAuto>=0.6){
+      const cap=capacity(); const val=cap>0?G.curDem/cap*100:999;
+      const up=r.upUtil, down=Math.max(12,r.upUtil-45);
+      if(val>=up && G.cpu<30){ const bump=val>=up+25?r.step*2:r.step; G.cpu=Math.min(30,G.cpu+bump); r.lastAuto=G.simHour; logMsg(dayLabel(),"🤖 วัดได้ "+Math.round(val)+"% ≥ เกณฑ์ → +"+bump+" VM","warn"); }
+      else if(val<=down && G.cpu>0){ const prev=G.cpu; G.cpu=Math.max(0,G.cpu-r.step); r.lastAuto=G.simHour; logMsg(dayLabel(),"🤖 โหลดต่ำ "+Math.round(val)+"% → −"+r.step+" VM","ok"); gracefulCheck(prev,G.cpu); }
+    }
+  }
+
+  // ---------- main loop ----------
+  function loop(ts){
+    if(!G||G.phase!=="run") return;
+    let dt=(ts-G.lastTs)/1000; G.lastTs=ts; if(dt>0.1)dt=0.1;
+    const cap=capacity(), burn=burnRate();
+    G.curCap=cap;
+    if(G.running){
+      const dtSim=dt*CFG.baseHps*G.speed;
+      G.simHour=Math.min(CFG.days*24, G.simHour+dtSim);
+      const dem=demandAt(G.simHour); G.curDem=dem;
+      const served=Math.min(cap,dem), dropped=dem-served; G.curServed=served;
+      G.budget -= burn*dtSim;
+      G.served += served*3600*dtSim;
+      if(dem>0){ G.dropped += dropped*3600*dtSim; }
+      G.eb = clamp((1 - G.dropped/G.ebAllowed)*100, 0, 100);
+      applyRules();
+      const ae=activeEvent();
+      if(ae && G.lastBanner!==ae.label){ G.lastBanner=ae.label; setBanner("evt",ae.label+" — เพิ่มความจุด่วน!"); if(!ae.fired){ae.fired=true; logMsg(dayLabel(),ae.label+" ทราฟฟิกพุ่งขึ้นมาก","warn");} }
+      else if(!ae && G.lastBanner){ G.lastBanner=""; setBanner("calm","ทราฟฟิกกลับสู่ปกติ"); setTimeout(()=>{ if(!activeEvent())hideBanner(); },1800); }
+      if(G.simHour-G.lastSample>0.5){ G.lastSample=G.simHour; G.hist.push({d:dem,c:cap}); if(G.hist.length>140)G.hist.shift(); }
+      if(G.budget<=0) return endGame(false,"เครดิตหมดกลางเดือน — บริการถูกตัด");
+      if(G.eb<=0)    return endGame(false,"Error budget หมด — ละเมิด SLO "+sloPct(G.slo));
+      if(G.simHour>=CFG.days*24) return endGame(true,"ผ่านครบ 1 เดือน ระบบยังออนไลน์");
+      G.spawnAcc += dem*dt*0.10*G.speed;
+      while(G.spawnAcc>1 && G.parts.length<150){ G.spawnAcc-=1; spawnParticle(); }
+    }
+    stepParticles(dt);
+    draw(); drawSpark(); syncHud(); syncPlan();
+    requestAnimationFrame(loop);
+  }
+  function activeEvent(){ for(const ev of G.events){ if(G.simHour>=ev.s&&G.simHour<ev.e) return ev; } return null; }
+  function setBanner(cls,txt){ const b=$("banner"); b.className="banner show "+cls; b.textContent=txt; }
+  function hideBanner(){ $("banner").className="banner"; }
+
+  function setSpeed(s){ G.speed=s; document.querySelectorAll(".seg button").forEach(b=>b.classList.toggle("on",+b.dataset.s===s)); }
+  function togglePause(){ if(!G||G.phase!=="run")return; G.running=!G.running; $("pp").textContent=G.running?"⏸":"▶"; }
+
+  // ---------- topology ----------
+  const cv=$("cv"), ctx=cv.getContext("2d");
+  const sp=$("spark"), sx=sp.getContext("2d");
+  let W=0,Hh=0,SW=0,SH=0,DPR=1;
+  function resize(){
+    DPR=Math.min(2,window.devicePixelRatio||1);
+    let r=cv.getBoundingClientRect(); W=r.width; Hh=r.height||320;
+    cv.width=W*DPR; cv.height=Hh*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+    r=sp.getBoundingClientRect(); SW=r.width; SH=r.height||54;
+    sp.width=SW*DPR; sp.height=SH*DPR; sx.setTransform(DPR,0,0,DPR,0,0);
+    if(G){ draw(); drawSpark(); }
+  }
+  window.addEventListener("resize",resize);
+
+  const MONO='ui-monospace,Menlo,Consolas,monospace', SANS='"Inter",Arial,sans-serif';
+  function layout(){
+    const ux=W*0.13, lbx=W*0.40, ix=W*0.74, cy=Hh*0.5;
+    const shown=Math.min(G.cpu,10);
+    const gap=Math.min(40,(Hh-60)/Math.max(1,shown)); const top=cy-(shown-1)*gap/2;
+    const insts=[]; for(let i=0;i<shown;i++) insts.push({x:ix,y:top+i*gap});
+    return {ux,lbx,cy,insts,hidden:G.cpu-shown};
+  }
+  function heat(u){ if(u<=0.001)return"#2c5b54"; if(u<0.7)return"#3ddc91"; if(u<=1.001)return"#e8a33d"; return"#ef6461"; }
+  function draw(){
+    if(!G){return;} ctx.clearRect(0,0,W,Hh);
+    const L=layout(); const over=G.curDem>G.curCap+0.5;
+    ctx.lineWidth=1.4; ctx.strokeStyle="#17443f";
+    L.insts.forEach(n=>seg(L.lbx,L.cy,n.x,n.y)); seg(L.ux,L.cy,L.lbx,L.cy);
+    circle(L.ux,L.cy,20,"#0c302d","#1d544e");
+    ctx.fillStyle="#5eead4"; ctx.beginPath(); ctx.arc(L.ux,L.cy-5,5,0,7); ctx.fill(); ctx.beginPath(); rr(L.ux-8,L.cy+2,16,8,4); ctx.fill();
+    lbl(L.ux,L.cy+34,"ผู้ใช้");
+    round(L.lbx-26,L.cy-20,52,40,over?"#3a1716":"#0c302d",over?"#ef6461":"#1d544e");
+    ctx.fillStyle=over?"#ef6461":"#5eead4"; ctx.font="700 12px "+MONO; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("LB",L.lbx,L.cy);
+    lbl(L.lbx,L.cy+34,"ตัวกระจายโหลด");
+    const per=L.insts.length? G.curServed/L.insts.length : 0;
+    L.insts.forEach(n=>{
+      const u=over?1.2:(per/CFG.cpu.cap); const col=heat(u);
+      round(n.x-18,n.y-13,36,26,"#0c302d",col);
+      ctx.strokeStyle=col; ctx.lineWidth=1.3; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(n.x-9,n.y-5); ctx.lineTo(n.x+4,n.y-5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(n.x-9,n.y);   ctx.lineTo(n.x+4,n.y);   ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(n.x-9,n.y+5); ctx.lineTo(n.x+1,n.y+5); ctx.stroke();
+      ctx.fillStyle=col; ctx.beginPath(); ctx.arc(n.x+9,n.y-5,1.8,0,7); ctx.fill();
+    });
+    if(L.insts.length===0){ ctx.fillStyle="#83aaa4"; ctx.font="12px "+SANS; ctx.textAlign="center"; ctx.fillText("ยังไม่มีเครื่อง (0 VM)",W*0.74,L.cy); }
+    if(L.hidden>0){ const last=L.insts[L.insts.length-1]; ctx.fillStyle="#83aaa4"; ctx.font="11px "+MONO; ctx.textAlign="center"; ctx.fillText("+"+L.hidden+" เครื่อง",L.insts[0].x,(last?last.y:L.cy)+26); }
+    G.parts.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,2.6,0,7); ctx.fillStyle=p.col; ctx.fill(); });
+    if(!G.running){ ctx.fillStyle="rgba(10,36,34,.55)"; ctx.fillRect(0,0,W,Hh); ctx.fillStyle="#5eead4"; ctx.font="700 15px "+SANS; ctx.textAlign="center"; ctx.fillText("⏸ หยุดชั่วคราว",W/2,Hh/2); }
+  }
+  function seg(a,b,c,d){ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke();}
+  function circle(x,y,r,f,s){ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=f;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=s;ctx.stroke();}
+  function round(x,y,w,h,f,s){ctx.beginPath();rr(x,y,w,h,8);ctx.fillStyle=f;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=s;ctx.stroke();}
+  function rr(x,y,w,h,r){ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+  function lbl(x,y,t){ctx.fillStyle="#83aaa4";ctx.font="11px "+SANS;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(t,x,y);}
+
+  function spawnParticle(){
+    const L=layout(); const ratio=G.curDem>0?G.curServed/G.curDem:1;
+    const ok=Math.random()<ratio;
+    const tgt= ok && L.insts.length ? L.insts[(Math.random()*L.insts.length)|0] : null;
+    G.parts.push({stage:0,tt:0,col:ok?"#5eead4":"#ef6461",drop:!ok,tgt,x:L.ux,y:L.cy,_L:L});
+  }
+  function stepParticles(dt){
+    const k=(reduce?6:3.4)*Math.max(1,G.speed*0.8);
+    G.parts.forEach(p=>{
+      const L=p._L; p.tt+=dt*k;
+      if(p.stage===0){ const t=Math.min(1,p.tt); p.x=L.ux+(L.lbx-L.ux)*t; p.y=L.cy; if(t>=1){p.stage=1;p.tt=0;} }
+      else { const t=Math.min(1,p.tt);
+        if(p.drop){ p.x=L.lbx+(Math.random()*2-1)*2; p.y=L.cy+t*70; p.col="rgba(239,100,97,"+(1-t)+")"; if(t>=1)p.dead=true; }
+        else if(p.tgt){ p.x=L.lbx+(p.tgt.x-L.lbx)*t; p.y=L.cy+(p.tgt.y-L.cy)*t; if(t>=1)p.dead=true; }
+        else p.dead=true; }
+    });
+    G.parts=G.parts.filter(p=>!p.dead);
+  }
+  function drawSpark(){
+    if(!G){return;} sx.clearRect(0,0,SW,SH);
+    const h=G.hist; if(h.length<2)return;
+    let mx=10; h.forEach(s=>{ mx=Math.max(mx,s.d,s.c); }); mx*=1.1;
+    const X=i=>i/(h.length-1)*SW, Y=v=>SH-4-(v/mx)*(SH-8);
+    sx.beginPath(); h.forEach((s,i)=>{ const x=X(i),y=Y(s.c); i?sx.lineTo(x,y):sx.moveTo(x,y); });
+    sx.strokeStyle="#5eead4"; sx.lineWidth=1.6; sx.stroke();
+    sx.beginPath(); h.forEach((s,i)=>{ const x=X(i),y=Y(s.d); i?sx.lineTo(x,y):sx.moveTo(x,y); });
+    sx.strokeStyle="#ef6461"; sx.lineWidth=1.8; sx.stroke();
+  }
+
+  // ---------- overlays ----------
+  function showStart(){
+    $("ov").style.display="grid";
+    $("ov-box").innerHTML=
+      '<h1><span class="sm">NT BOOTCAMP · WORKSHOP</span>Scale Ops — เกมจำลอง Auto-scaling</h1>'+
+      '<p>คุมระบบ AI ให้รอดตลอด <b>1 เดือน</b> ทราฟฟิกไหลเข้ามาแบบเรียลไทม์และค่อย ๆ โตขึ้น '+
+      'เร่งเวลาได้ <b>1× / 2× / 3×</b> และกด ⏸ เพื่อหยุดคิด — เล่นเป็น <b>ด่าน</b> ไล่ทีละแนวคิด</p>'+
+      '<ul class="rules">'+
+      '<li><span class="num">01</span><span class="tx"><b>เครดิตหมด = แพ้</b> ทุกชั่วโมงเบิร์นตามจำนวน VM ที่เปิด (cloud pricing)</span></li>'+
+      '<li><span class="num">02</span><span class="tx"><b>รักษา SLO</b> ทราฟฟิกล้น = request หลุด กิน <b>error budget</b> · budget หมด = ละเมิด SLO (แพ้) · เปิดเครื่องมากไป = เปลืองเครดิต</span></li>'+
+      '<li><span class="num">03</span><span class="tx"><b>ผ่านด่าน</b> (รอดครบเดือน) เพื่อปลดล็อกด่านถัดไป · เก็บสถิติแต่ละด่านไว้แข่งกัน</span></li>'+
+      '</ul>'+
+      '<button class="go" id="go">▶ ไปแผนที่ด่าน</button>'+
+      '<div class="tips">1 VM node ≈ '+CFG.cpu.cap+' req/s · '+CFG.cpu.cost+' เครดิต/ชม. — เส้นกราฟล่างคือ ทราฟฟิกเข้า (แดง) เทียบ ความจุ (เขียว) รักษาเขียวให้สูงกว่าแดงไว้</div>';
+    $("go").onclick=showLevels;
+  }
+  function endGame(win,reason){
+    G.phase="end";
+    const idx=G.mode-1;
+    const score=Math.round(G.served/1000 + Math.max(0,G.budget));
+    const isRec=recordScore(G.mode,score,win);
+    const hasNext=idx<4, nextUnlocked=win || stageUnlocked(idx+1);
+    $("ov").style.display="grid";
+    $("ov-box").innerHTML=
+      '<h1><span class="sm '+(win?'verdict-win':'verdict-lose')+'">'+(win?'ผ่านด่าน '+(idx+1)+' 🎉':'ด่าน '+(idx+1)+' · ยังไม่ผ่าน')+'</span>'+
+      MODES[idx].t+'</h1>'+
+      '<p>'+reason+'</p>'+
+      (isRec?'<div class="record">🏆 ทำลายสถิติของด่านนี้!</div>':'')+
+      (win&&hasNext?'<div class="record" style="background:#0e3a32;color:var(--green);box-shadow:none;border:1px solid #195245">🔓 ปลดล็อกด่าน '+(idx+2)+' แล้ว!</div>':'')+
+      '<div class="score">'+
+        '<div><div class="k">เหลือเครดิต</div><div class="v" style="color:var(--mint)">'+TH(Math.max(0,G.budget))+'</div></div>'+
+        '<div><div class="k">ผู้ใช้ที่รองรับ</div><div class="v">'+servedStr()+'</div></div>'+
+        '<div><div class="k">คะแนนรอบนี้</div><div class="v" style="color:var(--mint)">'+TH(score)+'</div></div>'+
+      '</div>'+
+      scoreTable(G.mode)+
+      '<div class="stepnav" style="margin-top:16px"><button class="skip" id="tomap">🗺️ แผนที่</button>'+
+        '<button class="skip" id="retry">↻ เล่นด่านนี้</button>'+
+        (hasNext&&nextUnlocked?'<button class="go" id="next" style="flex:1;margin-top:0">▶ ด่าน '+(idx+2)+'</button>':'<button class="go" id="next" style="flex:1;margin-top:0" disabled>'+(hasNext?'🔒 ด่านถัดไป':'ครบทุกด่าน 🎉')+'</button>')+
+      '</div>';
+    $("tomap").onclick=showLevels;
+    $("retry").onclick=()=>prepareStage(idx);
+    if(hasNext&&nextUnlocked) $("next").onclick=()=>prepareStage(idx+1);
+  }
+
+  // ---------- run-time controls ----------
+  function changeCpu(d){
+    if(!G||G.phase!=="run"||G.manualLocked)return;
+    const prev=G.cpu; G.cpu=clamp(G.cpu+d,0,30);
+    if(G.cpu<prev) gracefulCheck(prev,G.cpu);
+    syncPlan(); draw();
+  }
+  $("cpu-up").addEventListener("click",()=>changeCpu(1));
+  $("cpu-dn").addEventListener("click",()=>changeCpu(-1));
+  $("pp").addEventListener("click",togglePause);
+  document.querySelectorAll(".seg button").forEach(b=> b.addEventListener("click",()=>{ if(G)setSpeed(+b.dataset.s); }));
+  window.addEventListener("keydown",e=>{
+    if(!G||G.phase!=="run")return;
+    if(e.code==="Space"){ e.preventDefault(); togglePause(); }
+    else if(e.key==="1")setSpeed(1); else if(e.key==="2")setSpeed(2); else if(e.key==="3")setSpeed(3);
+    else if(e.key==="ArrowUp"){ changeCpu(1); }
+    else if(e.key==="ArrowDown"){ changeCpu(-1); }
+  });
+
+  setTimeout(resize,30);
+  showStart();
+})();
+</script>
+</body>
+</html>
